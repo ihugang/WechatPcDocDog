@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -11,10 +12,12 @@ import (
 	"strings"
 )
 
-func FilenameWithoutExtension(fn string) string {
+// 取不含后缀的文件名部门
+func getFilenameWithoutExtension(fn string) string {
 	return strings.TrimSuffix(fn, path.Ext(fn))
 }
 
+// 还原图片文件
 func decodeImage(fileName string) (bool, error) {
 	fmt.Println("Decoding image :", fileName)
 
@@ -84,7 +87,7 @@ func decodeImage(fileName string) (bool, error) {
 	}
 
 	folder := path.Dir(fileName)
-	fileName = FilenameWithoutExtension(path.Base(fileName)) + ext
+	fileName = getFilenameWithoutExtension(path.Base(fileName)) + ext
 	newFileName := path.Join(folder, fileName)
 
 	fileW, errW := os.Create(newFileName)
@@ -110,6 +113,12 @@ func decodeImage(fileName string) (bool, error) {
 	}
 	fileW.Close()
 	file.Close()
+
+	err = insertData(db, path.Base(fileName))
+	if err != nil {
+		fmt.Println("记录到数据库失败:", err)
+	}
+
 	fmt.Println("Image decoded successfully")
 	return true, nil
 
@@ -133,10 +142,20 @@ func WalkDir(filePath string) {
 	}
 }
 
+var db *sql.DB
+var err error
+
 func main() {
 	fmt.Println("Decoding Wechat Backup images...")
 
 	flag.Parse()
+
+	db, err = initDb()
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	if *root == "" {
 		folder, _ := os.Getwd()
